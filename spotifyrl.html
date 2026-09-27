@@ -7,16 +7,18 @@
 <script src="https://w.soundcloud.com/player/api.js"></script>
 <style>
   :root{
-    --bg:#000000;
-    --surface:#121212;
-    --surface-2:#181818;
+    --bg:#050505;
+    --surface:#101010;
+    --surface-2:#171717;
     --surface-hover:#242424;
     --text:#ffffff;
     --text-dim:#a7a7a7;
     --accent:#1ed760;
     --accent-dim:#1db954;
-    --border:#2a2a2a;
-    --bar-off:#3f3f3f;
+    --accent-red:#ff3347;
+    --border:rgba(255,255,255,.09);
+    --bar-off:#353535;
+    --glass:rgba(12,12,12,.68);
   }
   *{box-sizing:border-box;}
   html,body{
@@ -30,11 +32,16 @@
 
   .app{
     display:grid;
-    grid-template-columns:240px 1fr;
-    grid-template-rows:1fr auto;
+    grid-template-columns:240px minmax(0,1fr);
+    grid-template-rows:minmax(0,1fr) auto;
     height:100vh;
+    min-height:100dvh;
     gap:8px;
     padding:8px;
+    background:
+      radial-gradient(circle at 80% 20%, rgba(255,40,60,.055), transparent 34%),
+      radial-gradient(circle at 20% 80%, rgba(30,215,96,.035), transparent 30%),
+      #050505;
   }
 
   /* Sidebar */
@@ -65,10 +72,82 @@
   /* Main */
   .main{
     grid-row:1;
-    background:linear-gradient(180deg,#3a1c1c 0%, var(--surface) 320px, var(--surface) 100%);
+    min-width:0;
+    min-height:0;
+    background:
+      radial-gradient(900px 520px at 78% 7%, rgba(255,45,55,.16), transparent 70%),
+      radial-gradient(700px 480px at 18% 35%, rgba(120,20,30,.10), transparent 72%),
+      linear-gradient(180deg,#321719 0%,#151010 300px,#101010 620px,#0d0d0d 100%);
     border-radius:8px;
     overflow-y:auto;
+    overflow-x:hidden;
     position:relative;
+    isolation:isolate;
+  }
+  .main::after{
+    content:"";
+    position:absolute;
+    left:0;right:0;top:250px;height:1px;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,.08),transparent);
+    pointer-events:none;
+    z-index:0;
+  }
+
+  /* The glare lives on the complete tracks section, not the viewport-sized
+     .main element. This keeps the sweep covering every loaded track row. */
+  .tracks-section{
+    position:relative;
+    overflow:hidden;
+    isolation:isolate;
+  }
+  .tracks-section::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+    z-index:2;
+    background:
+      linear-gradient(
+        112deg,
+        transparent 0%,
+        transparent 34%,
+        rgba(255,255,255,.010) 42%,
+        rgba(255,75,90,.065) 48%,
+        rgba(255,255,255,.030) 52%,
+        rgba(255,255,255,.010) 58%,
+        transparent 66%,
+        transparent 100%
+      );
+    background-size:230% 100%;
+    background-position:-120% 0;
+    animation:trackGlare 13s cubic-bezier(.45,.05,.55,.95) infinite;
+    mix-blend-mode:screen;
+  }
+  .tracks-section::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+    z-index:2;
+    background:radial-gradient(
+      520px 260px at 75% 20%,
+      rgba(255,35,55,.045),
+      transparent 72%
+    );
+    animation:trackGlow 7s ease-in-out infinite alternate;
+  }
+  .tracks-section > .section-title,
+  .tracks-section > .track-list{
+    position:relative;
+    z-index:1;
+  }
+  @keyframes trackGlare{
+    0%{background-position:-120% 0;}
+    42%,100%{background-position:120% 0;}
+  }
+  @keyframes trackGlow{
+    from{opacity:.45;transform:translate3d(-1%,0,0) scale(1);}
+    to{opacity:1;transform:translate3d(1%,1%,0) scale(1.025);}
   }
 
   .topbar{
@@ -89,9 +168,19 @@
   }
   .profile-header img{
     width:180px;height:180px;border-radius:50%;
-    box-shadow:0 16px 40px rgba(0,0,0,.6);
+    box-shadow:0 16px 40px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.12),0 0 55px rgba(255,45,60,.16);
     object-fit:cover;background:var(--surface-2);
+    animation:vinylFloat 5s ease-in-out infinite;
   }
+  .profile-header img:hover{
+    animation:vinylSpin 2.2s linear infinite;
+    box-shadow:0 18px 48px rgba(0,0,0,.65),0 0 0 2px rgba(255,255,255,.18),0 0 75px rgba(255,45,60,.24);
+  }
+  @keyframes vinylFloat{
+    0%,100%{transform:translateY(0) rotate(-1deg)}
+    50%{transform:translateY(-5px) rotate(1deg)}
+  }
+  @keyframes vinylSpin{to{transform:rotate(360deg)}}
   .profile-header .kicker{font-size:12px;font-weight:700;letter-spacing:.3px;display:flex;align-items:center;gap:6px;}
   .verified-badge{width:14px;height:14px;flex:none;}
   .profile-header h1{
@@ -108,9 +197,19 @@
   .play-pill{
     width:56px;height:56px;border-radius:50%;
     background:var(--accent);display:flex;align-items:center;justify-content:center;
-    transition:transform .15s ease, background .15s ease;
+    transition:transform .18s ease, background .18s ease, box-shadow .18s ease;
+    box-shadow:0 0 0 0 rgba(30,215,96,.35);
   }
-  .play-pill:hover{transform:scale(1.05);background:#22e065;}
+  .play-pill:hover{
+    transform:scale(1.07);
+    background:#22e065;
+    box-shadow:0 0 0 9px rgba(30,215,96,.07),0 0 32px rgba(30,215,96,.22);
+  }
+  .play-pill.is-playing{animation:playPulse 1.8s ease-in-out infinite;}
+  @keyframes playPulse{
+    0%,100%{box-shadow:0 0 0 0 rgba(30,215,96,.22)}
+    50%{box-shadow:0 0 0 11px rgba(30,215,96,0),0 0 34px rgba(30,215,96,.18)}
+  }
   .play-pill svg{width:22px;height:22px;fill:#000;margin-left:2px;}
   .follow-btn{
     border:1px solid #5a5a5a;color:var(--text);
@@ -132,8 +231,17 @@
     display:grid;grid-template-columns:32px 1fr 110px 140px;gap:16px;align-items:center;
     padding:8px 12px;border-radius:4px;
   }
-  .track-row:hover{background:var(--surface-hover);}
-  .track-row.playing{background:var(--surface-hover);}
+  .track-row{
+    transition:background .18s ease,transform .18s ease,box-shadow .18s ease;
+  }
+  .track-row:hover{
+    background:linear-gradient(90deg,rgba(255,255,255,.055),rgba(255,255,255,.018));
+    transform:translateX(3px);
+  }
+  .track-row.playing{
+    background:linear-gradient(90deg,rgba(30,215,96,.10),rgba(255,255,255,.018));
+    box-shadow:inset 2px 0 0 var(--accent);
+  }
   .idx-cell{position:relative;color:var(--text-dim);font-size:14px;text-align:center;}
   .idx-num{display:block;}
   .idx-play{display:none;}
@@ -157,8 +265,14 @@
   .albums-grid{display:flex;flex-wrap:wrap;gap:20px;padding:0 24px 28px;}
   .album-card{width:160px;}
   .album-card .art-wrap{
-    position:relative;width:160px;height:160px;border-radius:6px;overflow:hidden;
-    background:var(--surface-2);box-shadow:0 8px 24px rgba(0,0,0,.4);
+    position:relative;width:160px;height:160px;border-radius:8px;overflow:hidden;
+    background:var(--surface-2);
+    box-shadow:0 8px 24px rgba(0,0,0,.4);
+    transition:transform .22s ease,box-shadow .22s ease;
+  }
+  .album-card:hover .art-wrap{
+    transform:translateY(-5px) scale(1.025);
+    box-shadow:0 18px 38px rgba(0,0,0,.55),0 0 28px rgba(255,45,60,.10);
   }
   .album-card img{width:100%;height:100%;object-fit:cover;display:block;}
   .album-card .play-overlay{
@@ -177,23 +291,38 @@
   .album-card .a-sub{font-size:12px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .album-card{cursor:pointer;}
 
-  /* Hidden real SoundCloud embed — used only as an audio engine via the Widget API */
+  /* SoundCloud engine: kept inside the viewport so mobile browsers don't suspend it. */
   .sc-audio-engine{
-    position:absolute;left:-9999px;top:-9999px;width:300px;height:166px;
-    opacity:0;pointer-events:none;
+    position:fixed;
+    left:0;
+    bottom:0;
+    width:2px;
+    height:2px;
+    opacity:.001;
+    pointer-events:none;
+    border:0;
+    z-index:2;
   }
 
   /* Now playing bar (fake waveform UI) */
   .nowplaying{
     grid-column:1 / -1;
-    background:var(--surface);
-    border-top:1px solid var(--border);
+    background:linear-gradient(135deg,rgba(28,28,28,.96),rgba(10,10,10,.96));
+    border:1px solid rgba(255,255,255,.08);
     border-radius:8px;
     display:none;
     align-items:center;
     gap:20px;
     padding:10px 16px;
     height:88px;
+    box-shadow:0 -10px 35px rgba(0,0,0,.28),0 0 35px rgba(255,35,55,.06);
+    backdrop-filter:blur(18px);
+    -webkit-backdrop-filter:blur(18px);
+  }
+  .nowplaying.show{animation:playerIn .28s ease-out both;}
+  @keyframes playerIn{
+    from{opacity:0;transform:translateY(10px)}
+    to{opacity:1;transform:translateY(0)}
   }
   .nowplaying.show{display:flex;}
   .np-meta{display:flex;align-items:center;gap:12px;width:220px;flex:none;min-width:0;}
@@ -224,7 +353,18 @@
     flex:1;min-width:1px;background:var(--bar-off);border-radius:1px;
     transition:background-color .1s linear;
   }
-  .waveform .bar.played{background:var(--accent);}
+  .waveform .bar.played{background:var(--accent);box-shadow:0 0 7px rgba(30,215,96,.28);}
+  .nowplaying.show .waveform .bar{
+    animation:waveIdle 1.1s ease-in-out infinite alternate;
+    animation-play-state:paused;
+  }
+  .nowplaying.is-playing .waveform .bar{animation-play-state:running;}
+  .waveform .bar:nth-child(3n){animation-delay:-.35s!important}
+  .waveform .bar:nth-child(4n){animation-delay:-.7s!important}
+  @keyframes waveIdle{
+    from{transform:scaleY(.78)}
+    to{transform:scaleY(1.08)}
+  }
 
   .np-right{width:150px;flex:none;display:flex;justify-content:flex-end;}
   .vol-wrap{display:flex;align-items:center;gap:8px;width:140px;}
@@ -252,7 +392,8 @@
   .sidebar-backdrop{display:none;}
 
   @media (max-width:768px){
-    .app{grid-template-columns:1fr;padding:0;gap:0;}
+    .app{grid-template-columns:1fr;padding:0;gap:0;min-height:100dvh;}
+    .main{padding-bottom:10px;}
 
     .sidebar{
       position:fixed;top:0;left:0;bottom:0;width:250px;z-index:50;
@@ -286,7 +427,13 @@
 
     .track-list-head{grid-template-columns:22px 1fr 56px;gap:8px;padding:0 6px 8px;}
     .track-list-head > div:nth-child(4){display:none;}
-    .track-row{grid-template-columns:22px 1fr 56px;gap:8px;padding:8px 6px;}
+    .track-row{
+      grid-template-columns:22px 1fr 56px;
+      gap:8px;
+      padding:10px 6px;
+      min-height:56px;
+      -webkit-tap-highlight-color:transparent;
+    }
     .track-row .date-cell{display:none;}
     .title-cell img{width:36px;height:36px;}
     .title-text .t{font-size:14px;}
@@ -297,7 +444,17 @@
     .album-card{width:118px;}
     .album-card .art-wrap{width:118px;height:118px;}
 
-    .nowplaying{gap:10px;padding:8px 10px;height:76px;}
+    .nowplaying{
+      position:sticky;
+      bottom:0;
+      z-index:20;
+      margin:0;
+      border-radius:0;
+      gap:8px;
+      padding:8px 10px calc(8px + env(safe-area-inset-bottom));
+      height:auto;
+      min-height:76px;
+    }
     .np-meta{width:auto;flex:1 1 auto;}
     .np-right{display:none;}
     .np-center{flex:2 1 auto;}
@@ -377,15 +534,17 @@
       <button class="follow-btn">Follow</button>
     </div>
 
-    <div class="section-title">Popular</div>
-    <div class="track-list">
-      <div class="track-list-head">
-        <div>#</div><div>Title</div><div>Plays</div><div>Published</div>
+    <section class="tracks-section">
+      <div class="section-title">Popular</div>
+      <div class="track-list">
+        <div class="track-list-head">
+          <div>#</div><div>Title</div><div>Plays</div><div>Published</div>
+        </div>
+        <div id="rows-tracks"></div>
+        <div class="empty-note">
+        </div>
       </div>
-      <div id="rows-tracks"></div>
-      <div class="empty-note">
-      </div>
-    </div>
+    </section>
 
     <div class="section-title">Albums</div>
     <div class="albums-grid" id="albums-grid"></div>
@@ -556,6 +715,10 @@
     document.getElementById("np-playicon").innerHTML = playing
       ? '<path d="M6 5h4v14H6zm8 0h4v14h-4z"></path>'
       : '<path d="M8 5v14l11-7z"></path>';
+    const hero = document.getElementById("hero-play");
+    if(hero) hero.classList.toggle("is-playing", playing);
+    const np = document.getElementById("nowplaying");
+    if(np) np.classList.toggle("is-playing", playing);
   }
 
   function volumeIconSVG(vol){
@@ -580,10 +743,15 @@
   function widgetSrc(url){
     return "https://w.soundcloud.com/player/?url=" + encodeURIComponent(url) +
       "&auto_play=true&hide_related=true&show_comments=false&show_user=false" +
-      "&show_reposts=false&show_teaser=false&visual=false&single_active=true";
+      "&show_reposts=false&show_teaser=false&visual=false&single_active=true" +
+      "&buying=false&sharing=false&download=false";
   }
 
   function playTrack(track){
+    // Build the URL synchronously too. This matters on mobile where a tap can
+    // happen before the background oEmbed requests have finished.
+    track.url = track.url || `https://soundcloud.com/${ARTIST}/${track.path || track.slug}`;
+
     document.querySelectorAll(".track-row.playing, .album-card.playing").forEach(r => r.classList.remove("playing"));
     const row = document.getElementById("row-" + track.slug) || document.getElementById("album-" + track.slug);
     if(row) row.classList.add("playing");
@@ -597,35 +765,59 @@
     buildWaveform(track.slug);
     setPlayingUI(true);
 
-    // Recreate the hidden engine iframe from scratch for every track (rather than
-    // re-navigating the existing one). Reusing the same iframe left the previous
-    // track's SC.Widget listeners still attached to its contentWindow, so once a
-    // second track loaded, both the old and new bindings fired against the same
-    // waveform/time UI and it broke. A fresh element guarantees only one binding.
+    // Recreate the engine so every track has exactly one set of Widget API
+    // listeners. Keep the iframe in-viewport; iOS/Android can suspend fully
+    // off-screen media frames.
     currentWidget = null;
-    currentDurationMs = 0;
     const oldEngine = document.getElementById("sc-audio-engine");
     const engine = document.createElement("iframe");
     engine.id = "sc-audio-engine";
     engine.className = "sc-audio-engine";
     engine.scrolling = "no";
-    engine.frameBorder = "no";
-    engine.allow = "autoplay";
+    engine.frameBorder = "0";
+    engine.allow = "autoplay; encrypted-media; picture-in-picture";
+    engine.setAttribute("playsinline", "");
+    engine.setAttribute("webkit-playsinline", "");
     oldEngine.replaceWith(engine);
+
     engine.src = widgetSrc(track.url);
 
     engine.onload = () => {
       currentWidget = SC.Widget(engine);
+
       currentWidget.bind(SC.Widget.Events.READY, () => {
         currentWidget.getDuration((d) => {
-          currentDurationMs = d;
+          currentDurationMs = d || 0;
           document.getElementById("np-duration").textContent = fmtTime(d);
         });
+
         currentWidget.setVolume(lastVolume);
+
+        // Explicit play() is important on mobile. auto_play alone can be
+        // rejected by Safari/Chrome mobile's media autoplay policy.
+        setTimeout(() => {
+          if(currentWidget) currentWidget.play();
+        }, 0);
       });
-      currentWidget.bind(SC.Widget.Events.PLAY, () => setPlayingUI(true));
-      currentWidget.bind(SC.Widget.Events.PAUSE, () => setPlayingUI(false));
-      currentWidget.bind(SC.Widget.Events.FINISH, () => setPlayingUI(false));
+
+      currentWidget.bind(SC.Widget.Events.PLAY, () => {
+        setPlayingUI(true);
+        document.getElementById("nowplaying").classList.add("is-playing");
+        document.getElementById("hero-play").classList.add("is-playing");
+      });
+
+      currentWidget.bind(SC.Widget.Events.PAUSE, () => {
+        setPlayingUI(false);
+        document.getElementById("nowplaying").classList.remove("is-playing");
+        document.getElementById("hero-play").classList.remove("is-playing");
+      });
+
+      currentWidget.bind(SC.Widget.Events.FINISH, () => {
+        setPlayingUI(false);
+        document.getElementById("nowplaying").classList.remove("is-playing");
+        document.getElementById("hero-play").classList.remove("is-playing");
+      });
+
       currentWidget.bind(SC.Widget.Events.PLAY_PROGRESS, (e) => {
         document.getElementById("np-elapsed").textContent = fmtTime(e.currentPosition);
         const frac = currentDurationMs ? e.currentPosition / currentDurationMs : 0;
