@@ -246,12 +246,83 @@
 
   ::-webkit-scrollbar{width:12px;}
   ::-webkit-scrollbar-thumb{background:#3a3a3a;border-radius:6px;border:3px solid var(--surface);}
+
+  /* Mobile menu button + backdrop (hidden on desktop) */
+  .menu-btn{display:none;}
+  .sidebar-backdrop{display:none;}
+
+  @media (max-width:768px){
+    .app{grid-template-columns:1fr;padding:0;gap:0;}
+
+    .sidebar{
+      position:fixed;top:0;left:0;bottom:0;width:250px;z-index:50;
+      border-radius:0;transform:translateX(-100%);
+      transition:transform .25s ease;
+      box-shadow:4px 0 28px rgba(0,0,0,.6);
+    }
+    .sidebar.open{transform:translateX(0);}
+    .sidebar-backdrop{
+      display:block;position:fixed;inset:0;background:rgba(0,0,0,.55);
+      z-index:40;opacity:0;pointer-events:none;transition:opacity .2s ease;
+    }
+    .sidebar-backdrop.show{opacity:1;pointer-events:auto;}
+
+    .main{border-radius:0;}
+    .menu-btn{display:flex;}
+    .topbar{padding:10px 12px;}
+
+    .profile-header{
+      flex-direction:column;align-items:center;text-align:center;
+      padding:20px 16px 16px;gap:10px;
+    }
+    .profile-header img{width:120px;height:120px;}
+    .profile-header .kicker{justify-content:center;}
+    .profile-header h1{font-size:34px;margin:4px 0 6px;word-break:break-word;}
+    .profile-header .sub{justify-content:center;font-size:12px;}
+
+    .action-row{padding:12px 16px 4px;justify-content:center;}
+    .section-title{padding:20px 16px 6px;font-size:18px;}
+    .track-list{padding:0 12px 16px;}
+
+    .track-list-head{grid-template-columns:22px 1fr 56px;gap:8px;padding:0 6px 8px;}
+    .track-list-head > div:nth-child(4){display:none;}
+    .track-row{grid-template-columns:22px 1fr 56px;gap:8px;padding:8px 6px;}
+    .track-row .date-cell{display:none;}
+    .title-cell img{width:36px;height:36px;}
+    .title-text .t{font-size:14px;}
+    .title-text .a{display:none;}
+    .plays-cell{font-size:12px;text-align:right;}
+
+    .albums-grid{padding:0 12px 20px;gap:14px;}
+    .album-card{width:118px;}
+    .album-card .art-wrap{width:118px;height:118px;}
+
+    .nowplaying{gap:10px;padding:8px 10px;height:76px;}
+    .np-meta{width:auto;flex:1 1 auto;}
+    .np-right{display:none;}
+    .np-center{flex:2 1 auto;}
+    .np-progress{max-width:none;}
+    .np-time{width:28px;font-size:10px;}
+    .np-transport{gap:14px;}
+  }
+
+  @media (max-width:420px){
+    .profile-header h1{font-size:26px;}
+    .profile-header img{width:96px;height:96px;}
+    .np-meta img{width:44px;height:44px;}
+    .np-meta .a{display:none;}
+    .np-transport button[title="Previous"],
+    .np-transport button[title="Next"]{display:none;}
+    .album-card{width:104px;}
+    .album-card .art-wrap{width:104px;height:104px;}
+  }
 </style>
 </head>
 <body>
 
+<div class="sidebar-backdrop" id="sidebar-backdrop"></div>
 <div class="app">
-  <div class="sidebar">
+  <div class="sidebar" id="sidebar">
     <div class="brand"><span class="dot"></span>Spotify RL</div>
     <div class="nav-item active">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l9 8h-3v9h-5v-6H11v6H6v-9H3z"/></svg>
@@ -276,6 +347,9 @@
   <div class="main" id="main">
     <div class="topbar">
       <div class="topbar-nav">
+        <button class="menu-btn circle-btn" id="menu-btn" title="Menu">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+        </button>
         <button class="circle-btn">&#8592;</button>
         <button class="circle-btn">&#8594;</button>
       </div>
@@ -673,6 +747,25 @@
         e.preventDefault();
         togglePlayback();
       }
+    });
+
+    // Mobile sidebar drawer
+    const sidebar = document.getElementById("sidebar");
+    const backdrop = document.getElementById("sidebar-backdrop");
+    const menuBtn = document.getElementById("menu-btn");
+    function closeSidebar(){
+      sidebar.classList.remove("open");
+      backdrop.classList.remove("show");
+    }
+    if(menuBtn){
+      menuBtn.addEventListener("click", () => {
+        sidebar.classList.toggle("open");
+        backdrop.classList.toggle("show");
+      });
+    }
+    backdrop.addEventListener("click", closeSidebar);
+    document.querySelectorAll(".nav-item").forEach(item => {
+      item.addEventListener("click", closeSidebar);
     });
   }
 
