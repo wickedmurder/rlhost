@@ -28,7 +28,17 @@
     -webkit-font-smoothing:antialiased;
   }
   a{color:inherit;text-decoration:none;}
-  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+  button{
+    font-family:inherit;
+    cursor:pointer;
+    border:none;
+    background:none;
+    color:inherit;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .play-pill,.track-row,.album-card,.np-playbtn{
+    touch-action:manipulation;
+  }
 
   .app{
     display:grid;
@@ -291,17 +301,20 @@
   .album-card .a-sub{font-size:12px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .album-card{cursor:pointer;}
 
-  /* SoundCloud engine: kept inside the viewport so mobile browsers don't suspend it. */
+  /* SoundCloud engine.
+     Keep it mounted and in the document. Mobile Safari/Chrome are much less
+     likely to suspend a cross-origin media iframe when it is not repeatedly
+     destroyed/recreated during playback. */
   .sc-audio-engine{
     position:fixed;
-    left:0;
+    left:-9999px;
     bottom:0;
-    width:2px;
-    height:2px;
-    opacity:.001;
+    width:1px;
+    height:1px;
+    opacity:0;
     pointer-events:none;
     border:0;
-    z-index:2;
+    z-index:-1;
   }
 
   /* Now playing bar (fake waveform UI) */
@@ -584,7 +597,16 @@
     </div>
   </div>
 
-  <iframe id="sc-audio-engine" class="sc-audio-engine" scrolling="no" frameborder="no" allow="autoplay"></iframe>
+  <iframe
+    id="sc-audio-engine"
+    class="sc-audio-engine"
+    scrolling="no"
+    frameborder="no"
+    allow="autoplay; encrypted-media; picture-in-picture"
+    playsinline
+    webkit-playsinline
+    title="Audio player"
+  ></iframe>
 </div>
 
 <script>
@@ -742,92 +764,202 @@
 
   function widgetSrc(url){
     return "https://w.soundcloud.com/player/?url=" + encodeURIComponent(url) +
-      "&auto_play=true&hide_related=true&show_comments=false&show_user=false" +
+      "&auto_play=false&hide_related=true&show_comments=false&show_user=false" +
       "&show_reposts=false&show_teaser=false&visual=false&single_active=true" +
       "&buying=false&sharing=false&download=false";
   }
 
+  /*
+   * MOBILE PLAYBACK FIX
+   *
+   * The old version recreated the SoundCloud iframe every time and waited for
+   * iframe.onload -> Widget.READY -> setTimeout() -> widget.play().
+   *
+   * On iOS Safari and many Android browsers that loses the original tap's
+   * user-activation by the time play() is called, so the browser silently
+   * blocks playback.
+   *
+   * We now keep ONE SoundCloud widget alive for the entire page lifetime and
+   * use Widget.load() from the actual tap/click handler with auto_play:true.
+   * This avoids destroying the media context and gives SoundCloud's player
+   * the best chance to consume the mobile user gesture.
+   */
+
+  let scEngine = null;
+  let scEngineReady = false;
+  let pendingTrack = null;
+  let playbackRequestId = 0;
+
+  function ensureSoundCloudWidget(){
+    if(scEngine) return scEngine;
+
+    const engine = document.getElementById("sc-audio-engine");
+    if(!engine) return null;
+
+    scEngine = SC.Widget(engine);
+
+    scEngine.bind(SC.Widget.Events.READY, () => {
+      scEngineReady = true;
+
+      try{
+        scEngine.setVolume(lastVolume);
+      }catch(e){}
+
+      if(pendingTrack){
+        const track = pendingTrack;
+        pendingTrack = null;
+        loadTrackIntoWidget(track, ++playbackRequestId);
+      }
+    });
+
+    scEngine.bind(SC.Widget.Events.PLAY, () => {
+      setPlayingUI(true);
+      document.getElementById("nowplaying").classList.add("is-playing");
+      document.getElementById("hero-play").classList.add("is-playing");
+    });
+
+    scEngine.bind(SC.Widget.Events.PAUSE, () => {
+      setPlayingUI(false);
+      document.getElementById("nowplaying").classList.remove("is-playing");
+      document.getElementById("hero-play").classList.remove("is-playing");
+    });
+
+    scEngine.bind(SC.Widget.Events.FINISH, () => {
+      setPlayingUI(false);
+      document.getElementById("nowplaying").classList.remove("is-playing");
+      document.getElementById("hero-play").classList.remove("is-playing");
+    });
+
+    scEngine.bind(SC.Widget.Events.PLAY_PROGRESS, (e) => {
+      document.getElementById("np-elapsed").textContent = fmtTime(e.currentPosition);
+      const frac = currentDurationMs ? e.currentPosition / currentDurationMs : 0;
+      setWaveformProgress(frac);
+    });
+
+    return scEngine;
+  }
+
+  function loadTrackIntoWidget(track, requestId){
+    if(!scEngine || requestId !== playbackRequestId) return;
+
+    const url = track.url || `https://soundcloud.com/${ARTIST}/${track.path || track.slug}`;
+
+    currentWidget = scEngine;
+
+    /*
+     * IMPORTANT: auto_play:true is passed directly to SoundCloud's load()
+     * instead of calling widget.play() later from setTimeout().
+     *
+     * On mobile this is substantially more reliable because the load request
+     * originates from the same synchronous click/tap chain.
+     */
+    try{
+      scEngine.load(url, {
+        auto_play: true,
+        hide_related: true,
+        show_comments: false,
+        show_user: false,
+        show_reposts: false,
+        show_teaser: false,
+        visual: false,
+        single_active: true,
+        buying: false,
+        sharing: false,
+        download: false
+      });
+    }catch(e){
+      console.warn("SoundCloud load failed:", e);
+      setPlayingUI(false);
+    }
+
+    /*
+     * Some browsers/SoundCloud player versions don't report duration
+     * immediately after load, so poll briefly without attempting another
+     * autoplay operation.
+     */
+    let tries = 0;
+    const durationTimer = setInterval(() => {
+      if(requestId !== playbackRequestId){
+        clearInterval(durationTimer);
+        return;
+      }
+
+      if(!scEngine){
+        clearInterval(durationTimer);
+        return;
+      }
+
+      scEngine.getDuration((d) => {
+        if(d){
+          currentDurationMs = d;
+          document.getElementById("np-duration").textContent = fmtTime(d);
+          clearInterval(durationTimer);
+        }
+      });
+
+      if(++tries > 40) clearInterval(durationTimer);
+    }, 250);
+  }
+
   function playTrack(track){
-    // Build the URL synchronously too. This matters on mobile where a tap can
-    // happen before the background oEmbed requests have finished.
+    /*
+     * Everything above this point runs synchronously from the user's tap.
+     * Do not insert await(), setTimeout(), or iframe recreation here.
+     */
     track.url = track.url || `https://soundcloud.com/${ARTIST}/${track.path || track.slug}`;
 
-    document.querySelectorAll(".track-row.playing, .album-card.playing").forEach(r => r.classList.remove("playing"));
-    const row = document.getElementById("row-" + track.slug) || document.getElementById("album-" + track.slug);
+    document.querySelectorAll(".track-row.playing, .album-card.playing")
+      .forEach(r => r.classList.remove("playing"));
+
+    const row =
+      document.getElementById("row-" + track.slug) ||
+      document.getElementById("album-" + track.slug);
+
     if(row) row.classList.add("playing");
 
-    document.getElementById("np-title").textContent = track.title || track.fallbackTitle;
+    document.getElementById("np-title").textContent =
+      track.title || track.fallbackTitle;
+
     document.getElementById("np-art").src = track.artwork || AVATAR;
     document.getElementById("nowplaying").classList.add("show");
     document.getElementById("np-elapsed").textContent = "0:00";
     document.getElementById("np-duration").textContent = "0:00";
+
     currentDurationMs = 0;
     buildWaveform(track.slug);
+
+    const widget = ensureSoundCloudWidget();
+
+    if(!widget || !scEngineReady){
+      /*
+       * The iframe itself is already in the page. If its API has not finished
+       * initializing yet, queue the track; READY will load it immediately.
+       */
+      pendingTrack = track;
+      setPlayingUI(true);
+      return;
+    }
+
+    /*
+     * This is intentionally called directly from the click/touch handler.
+     */
+    playbackRequestId++;
     setPlayingUI(true);
-
-    // Recreate the engine so every track has exactly one set of Widget API
-    // listeners. Keep the iframe in-viewport; iOS/Android can suspend fully
-    // off-screen media frames.
-    currentWidget = null;
-    const oldEngine = document.getElementById("sc-audio-engine");
-    const engine = document.createElement("iframe");
-    engine.id = "sc-audio-engine";
-    engine.className = "sc-audio-engine";
-    engine.scrolling = "no";
-    engine.frameBorder = "0";
-    engine.allow = "autoplay; encrypted-media; picture-in-picture";
-    engine.setAttribute("playsinline", "");
-    engine.setAttribute("webkit-playsinline", "");
-    oldEngine.replaceWith(engine);
-
-    engine.src = widgetSrc(track.url);
-
-    engine.onload = () => {
-      currentWidget = SC.Widget(engine);
-
-      currentWidget.bind(SC.Widget.Events.READY, () => {
-        currentWidget.getDuration((d) => {
-          currentDurationMs = d || 0;
-          document.getElementById("np-duration").textContent = fmtTime(d);
-        });
-
-        currentWidget.setVolume(lastVolume);
-
-        // Explicit play() is important on mobile. auto_play alone can be
-        // rejected by Safari/Chrome mobile's media autoplay policy.
-        setTimeout(() => {
-          if(currentWidget) currentWidget.play();
-        }, 0);
-      });
-
-      currentWidget.bind(SC.Widget.Events.PLAY, () => {
-        setPlayingUI(true);
-        document.getElementById("nowplaying").classList.add("is-playing");
-        document.getElementById("hero-play").classList.add("is-playing");
-      });
-
-      currentWidget.bind(SC.Widget.Events.PAUSE, () => {
-        setPlayingUI(false);
-        document.getElementById("nowplaying").classList.remove("is-playing");
-        document.getElementById("hero-play").classList.remove("is-playing");
-      });
-
-      currentWidget.bind(SC.Widget.Events.FINISH, () => {
-        setPlayingUI(false);
-        document.getElementById("nowplaying").classList.remove("is-playing");
-        document.getElementById("hero-play").classList.remove("is-playing");
-      });
-
-      currentWidget.bind(SC.Widget.Events.PLAY_PROGRESS, (e) => {
-        document.getElementById("np-elapsed").textContent = fmtTime(e.currentPosition);
-        const frac = currentDurationMs ? e.currentPosition / currentDurationMs : 0;
-        setWaveformProgress(frac);
-      });
-    };
+    loadTrackIntoWidget(track, playbackRequestId);
   }
 
   function togglePlayback(){
-    if(currentWidget) currentWidget.toggle();
+    if(!currentWidget) return;
+
+    /*
+     * toggle() is called directly from the mobile play button, preserving
+     * user activation. If no track has loaded yet, there is nothing to toggle.
+     */
+    try{
+      currentWidget.toggle();
+    }catch(e){
+      console.warn("SoundCloud toggle failed:", e);
+    }
   }
 
   function buildRow(track, index){
@@ -910,6 +1042,21 @@
   }
 
   function init(){
+    /*
+     * Initialize the SoundCloud widget once. Do NOT wait for this before
+     * accepting a user's tap; playTrack() queues a request if initialization
+     * is still in progress.
+     *
+     * A real SoundCloud URL is used so the cross-origin Widget API is ready
+     * before the first mobile interaction. We do not autoplay this bootstrap
+     * track.
+     */
+    const engine = document.getElementById("sc-audio-engine");
+    engine.src = widgetSrc(`https://soundcloud.com/${ARTIST}/${TRACKS[0].slug}`);
+    engine.onload = () => {
+      ensureSoundCloudWidget();
+    };
+
     renderList(TRACKS, "rows-tracks");
     renderAlbums(ALBUMS, "albums-grid");
 
