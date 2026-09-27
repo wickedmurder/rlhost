@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WickedMurder© — Player</title>
+<script src="https://w.soundcloud.com/player/api.js"></script>
+<style>
+  :root{
+    --bg:#000000;
+    --surface:#121212;
+    --surface-2:#181818;
+    --surface-hover:#242424;
+    --text:#ffffff;
+    --text-dim:#a7a7a7;
+    --accent:#1ed760;
+    --accent-dim:#1db954;
+    --border:#2a2a2a;
+    --bar-off:#3f3f3f;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;padding:0;height:100%;
+    background:var(--bg);color:var(--text);
+    font-family:-apple-system,"Helvetica Neue",Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit;text-decoration:none;}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+
+  .app{
+    display:grid;
+    grid-template-columns:240px 1fr;
+    grid-template-rows:1fr auto;
+    height:100vh;
+    gap:8px;
+    padding:8px;
+  }
+
+  /* Sidebar */
+  .sidebar{
+    grid-row:1;
+    background:var(--surface);
+    border-radius:8px;
+    padding:20px 16px;
+    overflow-y:auto;
+  }
+  .brand{
+    display:flex;align-items:center;gap:10px;
+    padding:6px 8px 22px;
+    font-weight:800;font-size:20px;letter-spacing:.2px;
+  }
+  .brand .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);flex:none;}
+  .nav-item{
+    display:flex;align-items:center;gap:14px;
+    padding:9px 8px;border-radius:4px;
+    color:var(--text-dim);font-size:14px;font-weight:600;
+  }
+  .nav-item.active{color:var(--text);}
+  .nav-item svg{width:20px;height:20px;flex:none;}
+  .sidebar hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
+  .side-meta{padding:0 8px;color:var(--text-dim);font-size:12px;line-height:1.7;}
+  .side-meta strong{color:var(--text);display:block;font-size:13px;margin-bottom:2px;}
+
+  /* Main */
+  .main{
+    grid-row:1;
+    background:linear-gradient(180deg,#3a1c1c 0%, var(--surface) 320px, var(--surface) 100%);
+    border-radius:8px;
+    overflow-y:auto;
+    position:relative;
+  }
+
+  .topbar{
+    position:sticky;top:0;z-index:5;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 24px;background:rgba(0,0,0,0);
+  }
+  .topbar-nav{display:flex;gap:8px;}
+  .circle-btn{
+    width:32px;height:32px;border-radius:50%;
+    background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;
+  }
+  .circle-btn svg{width:16px;height:16px;}
+
+  .profile-header{
+    display:flex;align-items:flex-end;gap:24px;
+    padding:24px 24px 28px;
+  }
+  .profile-header img{
+    width:180px;height:180px;border-radius:50%;
+    box-shadow:0 16px 40px rgba(0,0,0,.6);
+    object-fit:cover;background:var(--surface-2);
+  }
+  .profile-header .kicker{font-size:12px;font-weight:700;letter-spacing:.3px;display:flex;align-items:center;gap:6px;}
+  .verified-badge{width:14px;height:14px;flex:none;}
+  .profile-header h1{
+    font-size:64px;line-height:1.05;margin:6px 0 16px;font-weight:900;
+    letter-spacing:-1px;
+  }
+  .profile-header .sub{color:var(--text-dim);font-size:14px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .profile-header .sub b{color:var(--text);font-weight:700;}
+
+  .action-row{
+    display:flex;align-items:center;gap:24px;
+    padding:20px 24px 8px;
+  }
+  .play-pill{
+    width:56px;height:56px;border-radius:50%;
+    background:var(--accent);display:flex;align-items:center;justify-content:center;
+    transition:transform .15s ease, background .15s ease;
+  }
+  .play-pill:hover{transform:scale(1.05);background:#22e065;}
+  .play-pill svg{width:22px;height:22px;fill:#000;margin-left:2px;}
+  .follow-btn{
+    border:1px solid #5a5a5a;color:var(--text);
+    padding:7px 16px;border-radius:999px;font-size:14px;font-weight:600;
+  }
+  .follow-btn:hover{border-color:var(--text);}
+
+  .section-title{
+    padding:24px 24px 8px;font-size:22px;font-weight:800;
+  }
+
+  .track-list{padding:0 24px 24px;}
+  .track-list-head{
+    display:grid;grid-template-columns:32px 1fr 110px 140px;gap:16px;
+    padding:0 12px 8px;border-bottom:1px solid var(--border);
+    color:var(--text-dim);font-size:12px;font-weight:600;
+  }
+  .track-row{
+    display:grid;grid-template-columns:32px 1fr 110px 140px;gap:16px;align-items:center;
+    padding:8px 12px;border-radius:4px;
+  }
+  .track-row:hover{background:var(--surface-hover);}
+  .track-row.playing{background:var(--surface-hover);}
+  .idx-cell{position:relative;color:var(--text-dim);font-size:14px;text-align:center;}
+  .idx-num{display:block;}
+  .idx-play{display:none;}
+  .track-row:hover .idx-num,.track-row.playing .idx-num{display:none;}
+  .track-row:hover .idx-play,.track-row.playing .idx-play{display:flex;align-items:center;justify-content:center;}
+  .track-row.playing .idx-num{color:var(--accent);}
+  .idx-play svg{width:12px;height:12px;fill:var(--text);}
+
+  .title-cell{display:flex;align-items:center;gap:12px;min-width:0;}
+  .title-cell img{width:40px;height:40px;border-radius:3px;object-fit:cover;background:var(--surface-2);flex:none;}
+  .title-text{min-width:0;}
+  .title-text .t{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .title-text .a{font-size:13px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .track-row.playing .t{color:var(--accent);}
+
+  .plays-cell{color:var(--text-dim);font-size:13px;}
+  .date-cell{color:var(--text-dim);font-size:13px;}
+
+  .empty-note{color:var(--text-dim);font-size:13px;padding:8px 12px;}
+
+  .albums-grid{display:flex;flex-wrap:wrap;gap:20px;padding:0 24px 28px;}
+  .album-card{width:160px;}
+  .album-card .art-wrap{
+    position:relative;width:160px;height:160px;border-radius:6px;overflow:hidden;
+    background:var(--surface-2);box-shadow:0 8px 24px rgba(0,0,0,.4);
+  }
+  .album-card img{width:100%;height:100%;object-fit:cover;display:block;}
+  .album-card .play-overlay{
+    position:absolute;right:8px;bottom:8px;width:40px;height:40px;border-radius:50%;
+    background:var(--accent);display:flex;align-items:center;justify-content:center;
+    opacity:0;transform:translateY(6px);
+    transition:opacity .15s ease, transform .15s ease;
+  }
+  .album-card .play-overlay svg{width:16px;height:16px;fill:#000;margin-left:2px;}
+  .album-card:hover .play-overlay,.album-card.playing .play-overlay{opacity:1;transform:translateY(0);}
+  .album-card .a-title{
+    margin-top:10px;font-size:14px;font-weight:600;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .album-card.playing .a-title{color:var(--accent);}
+  .album-card .a-sub{font-size:12px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .album-card{cursor:pointer;}
+
+  /* Hidden real SoundCloud embed — used only as an audio engine via the Widget API */
+  .sc-audio-engine{
+    position:absolute;left:-9999px;top:-9999px;width:300px;height:166px;
+    opacity:0;pointer-events:none;
+  }
+
+  /* Now playing bar (fake waveform UI) */
+  .nowplaying{
+    grid-column:1 / -1;
+    background:var(--surface);
+    border-top:1px solid var(--border);
+    border-radius:8px;
+    display:none;
+    align-items:center;
+    gap:20px;
+    padding:10px 16px;
+    height:88px;
+  }
+  .nowplaying.show{display:flex;}
+  .np-meta{display:flex;align-items:center;gap:12px;width:220px;flex:none;min-width:0;}
+  .np-meta img{width:56px;height:56px;border-radius:3px;object-fit:cover;background:var(--surface-2);flex:none;}
+  .np-meta .t{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .np-meta .a{font-size:11px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+  .np-center{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px;}
+  .np-transport{display:flex;align-items:center;gap:18px;}
+  .np-transport button{color:var(--text-dim);}
+  .np-transport button:hover{color:var(--text);}
+  .np-transport svg{width:16px;height:16px;fill:currentColor;}
+  .np-playbtn{
+    width:30px;height:30px;border-radius:50%;background:#fff;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .np-playbtn svg{width:14px;height:14px;fill:#000;}
+  .np-playbtn:hover{transform:scale(1.06);}
+
+  .np-progress{display:flex;align-items:center;gap:8px;width:100%;max-width:560px;}
+  .np-time{font-size:11px;color:var(--text-dim);width:36px;flex:none;}
+  .np-time.end{text-align:left;}
+  .np-time.start{text-align:right;}
+  .waveform{
+    flex:1;height:32px;display:flex;align-items:flex-end;gap:1px;cursor:pointer;position:relative;
+  }
+  .waveform .bar{
+    flex:1;min-width:1px;background:var(--bar-off);border-radius:1px;
+    transition:background-color .1s linear;
+  }
+  .waveform .bar.played{background:var(--accent);}
+
+  .np-right{width:150px;flex:none;display:flex;justify-content:flex-end;}
+  .vol-wrap{display:flex;align-items:center;gap:8px;width:140px;}
+  .vol-icon{color:var(--text-dim);flex:none;}
+  .vol-icon:hover{color:var(--text);}
+  .vol-icon svg{width:18px;height:18px;fill:currentColor;}
+  .vol-slider{
+    -webkit-appearance:none;appearance:none;
+    width:100px;height:4px;border-radius:2px;outline:none;
+    background:linear-gradient(to right, var(--accent) 0%, var(--accent) 80%, #4d4d4d 80%, #4d4d4d 100%);
+  }
+  .vol-slider::-webkit-slider-thumb{
+    -webkit-appearance:none;width:12px;height:12px;border-radius:50%;
+    background:#fff;cursor:pointer;
+  }
+  .vol-slider::-moz-range-thumb{
+    width:12px;height:12px;border-radius:50%;background:#fff;border:none;cursor:pointer;
+  }
+
+  ::-webkit-scrollbar{width:12px;}
+  ::-webkit-scrollbar-thumb{background:#3a3a3a;border-radius:6px;border:3px solid var(--surface);}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="brand"><span class="dot"></span>Spotify RL</div>
+    <div class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l9 8h-3v9h-5v-6H11v6H6v-9H3z"/></svg>
+      Label
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><line x1="21" y1="21" x2="16" y2="16" stroke="currentColor" stroke-width="2"/></svg>
+      Search
+    </div>
+    <hr>
+    <div class="nav-item active">Tracks</div>
+    <div class="nav-item">Likes</div>
+    <div class="nav-item">Playlists</div>
+    <hr>
+    <div class="side-meta">
+      <strong>WickedMurder©</strong>
+      Independent • Label • Collective • Curator • Distributor<br><br>
+      95,802 followers · 286.7K monthly listeners<br><br>
+    </div>
+  </div>
+
+  <div class="main" id="main">
+    <div class="topbar">
+      <div class="topbar-nav">
+        <button class="circle-btn">&#8592;</button>
+        <button class="circle-btn">&#8594;</button>
+      </div>
+    </div>
+
+    <div class="profile-header">
+      <img src="https://i1.sndcdn.com/avatars-86C7dlqkmlZExP8z-4b3zTw-t500x500.jpg" alt="WickedMurder©">
+      <div>
+        <div class="kicker">
+          <svg class="verified-badge" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="12" fill="#2e77ff"/>
+            <path d="M9.9 16.2l-3.4-3.4 1.4-1.4 2 2 5.2-5.2 1.4 1.4z" fill="#fff"/>
+          </svg>
+          Record Label
+        </div>
+        <h1>WickedMurder©</h1>
+        <div class="sub"><b>286.7K</b>&nbsp;monthly listeners · <b>95,802</b>&nbsp;followers · Independent • Label • Collective • Curator • Distributor</div>
+      </div>
+    </div>
+
+    <div class="action-row">
+      <button class="play-pill" id="hero-play">
+        <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+      </button>
+      <button class="follow-btn">Follow</button>
+    </div>
+
+    <div class="section-title">Popular</div>
+    <div class="track-list">
+      <div class="track-list-head">
+        <div>#</div><div>Title</div><div>Plays</div><div>Published</div>
+      </div>
+      <div id="rows-tracks"></div>
+      <div class="empty-note">
+      </div>
+    </div>
+
+    <div class="section-title">Albums</div>
+    <div class="albums-grid" id="albums-grid"></div>
+  </div>
+
+  <div class="nowplaying" id="nowplaying">
+    <div class="np-meta">
+      <img id="np-art" src="" alt="">
+      <div style="min-width:0;">
+        <div class="t" id="np-title">—</div>
+        <div class="a">WickedMurder©</div>
+      </div>
+    </div>
+
+    <div class="np-center">
+      <div class="np-transport">
+        <button title="Previous"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
+        <button class="np-playbtn" id="np-playbtn">
+          <svg id="np-playicon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <button title="Next"><svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM6 6l8.5 6L6 18z"/></svg></button>
+      </div>
+      <div class="np-progress">
+        <div class="np-time start" id="np-elapsed">0:00</div>
+        <div class="waveform" id="waveform"></div>
+        <div class="np-time end" id="np-duration">0:00</div>
+      </div>
+    </div>
+
+    <div class="np-right">
+      <div class="vol-wrap">
+        <button class="vol-icon" id="vol-icon" title="Mute">
+          <svg id="vol-icon-svg" viewBox="0 0 24 24"><path d="M3 10v4h4l5 5V5L7 10H3z"/><path d="M14.5 12c0-1.77-1-3.29-2.5-4.03v8.06c1.5-.74 2.5-2.26 2.5-4.03z"/><path d="M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+        </button>
+        <input type="range" min="0" max="100" value="80" class="vol-slider" id="vol-slider">
+      </div>
+    </div>
+  </div>
+
+  <iframe id="sc-audio-engine" class="sc-audio-engine" scrolling="no" frameborder="no" allow="autoplay"></iframe>
+</div>
+
+<script>
+  const ARTIST = "wickedmurder";
+  const AVATAR = "https://i1.sndcdn.com/avatars-86C7dlqkmlZExP8z-4b3zTw-t500x500.jpg";
+  const BAR_COUNT = 90;
+
+  // WickedMurder©'s popular tracks (from soundcloud.com/wickedmurder/popular-tracks).
+  // "plays" is an illustrative figure — SoundCloud doesn't expose real play counts
+  // without an authenticated API key, so these are not pulled from SoundCloud.
+  const TRACKS = [
+    { slug: "worstcasescenario",        fallbackTitle: "worstcasescenario",             date: "2025-09-09", plays: 412000 },
+    { slug: "stuck-2",                  fallbackTitle: "stuck 2 w/ misakufoxx",         date: "2022-10-06", plays: 388000 },
+    { slug: "monster",                  fallbackTitle: "monster",                       date: "2022-08-11", plays: 356000 },
+    { slug: "everything",               fallbackTitle: "everything",                    date: "2022-07-27", plays: 331000 },
+    { slug: "stuck",                    fallbackTitle: "stuck",                         date: "2022-09-09", plays: 298000 },
+    { slug: "cursed",                   fallbackTitle: "cursed",                        date: "2022-08-03", plays: 276000 },
+    { slug: "throneofsins",             fallbackTitle: "throneofsins",                  date: "2025-08-31", plays: 251000 },
+    { slug: "hurt-u",                   fallbackTitle: "hurt u",                        date: "2025-08-15", plays: 233000 },
+    { slug: "lilith",                   fallbackTitle: "lilith",                        date: "2025-08-17", plays: 214000 },
+    { slug: "the-oso-silent-hill",      fallbackTitle: "the oso silent hill",           date: "2026-01-16", plays: 198000 },
+    { slug: "prayer",                   fallbackTitle: "prayer",                        date: "2025-10-22", plays: 181000 },
+    { slug: "as-evil-as-evil-can-be",   fallbackTitle: "as evil as evil can be",        date: "2025-08-13", plays: 167000 },
+    { slug: "blood-filled-chalice",     fallbackTitle: "bloodfilledchalice",            date: "2025-09-19", plays: 152000 },
+    { slug: "insidemyhead",             fallbackTitle: "insidemyhead",                  date: "2025-08-29", plays: 139000 },
+    { slug: "justlikeme",               fallbackTitle: "justlikeme w/ toki",            date: "2025-09-12", plays: 128000 },
+    { slug: "liar",                     fallbackTitle: "liar",                          date: "2025-09-08", plays: 116000 },
+    { slug: "child-of-the-black-sun",   fallbackTitle: "child of the black sun",        date: "2025-08-15", plays: 105000 },
+    { slug: "offer",                    fallbackTitle: "offer",                         date: "2025-08-17", plays: 95400 },
+    { slug: "thru-the-night",           fallbackTitle: "thru the night w/ superybf!",   date: "2022-10-24", plays: 87200 },
+    { slug: "how-i-die",                fallbackTitle: "how i die",                     date: "2022-10-18", plays: 79800 },
+    { slug: "zombie",                   fallbackTitle: "zombie w/ coni miiura",         date: "2022-10-22", plays: 72500 },
+    { slug: "pill",                     fallbackTitle: "pill",                          date: "2022-10-23", plays: 65900 },
+    { slug: "forever-contract",         fallbackTitle: "forever contract",              date: "2026-03-04", plays: 59300 },
+    { slug: "rabbit-intro",             fallbackTitle: "rabbit *intro*",                date: "2026-02-28", plays: 53100 },
+    { slug: "witch",                    fallbackTitle: "witch",                         date: "2026-03-19", plays: 47800 },
+    { slug: "asphixiate",               fallbackTitle: "asphixiate",                    date: "2026-01-22", plays: 42600 },
+    { slug: "start-to-finish",          fallbackTitle: "start to finish",               date: "2026-01-22", plays: 37900 },
+    { slug: "she-told-me",              fallbackTitle: "she told me",                   date: "2025-08-12", plays: 33200 },
+    { slug: "look-away",                fallbackTitle: "look",                          date: "2026-02-06", plays: 28700 },
+    { slug: "one-more-line",            fallbackTitle: "One More Line",                 date: "2025-10-10", plays: 24100 }
+  ];
+
+  // WickedMurder©'s albums/playlists (from soundcloud.com/wickedmurder/albums).
+  // These are SoundCloud "sets", so the URL path is /wickedmurder/sets/<slug>.
+  const ALBUMS = [
+    { slug: "rabbit",     path: "sets/rabbit",   fallbackTitle: "1nf4my - rabbit",                          date: "2025-10-25" },
+    { slug: "idtiwapm",   path: "sets/idtiwapm", fallbackTitle: "UOKSANE? - i dont think it was a phase mom", date: "2026-01-16" },
+    { slug: "hatch",      path: "sets/hatch",    fallbackTitle: "1nf4my - hatch",                           date: "2025-08-12" },
+    { slug: "dark-nights",path: "sets/dark-nights", fallbackTitle: "Nto.MakEleven - Dark Nights",           date: "2025-10-10" },
+    { slug: "tlu",        path: "sets/tlu",      fallbackTitle: "1nf4my - things left unsaid",              date: "2025-08-18" }
+  ];
+
+  let currentWidget = null;
+  let currentDurationMs = 0;
+  let isPlaying = false;
+  let lastVolume = 80;
+
+  function formatDate(iso){
+    try{
+      const d = new Date(iso);
+      return d.toLocaleDateString(undefined, { year:"numeric", month:"short", day:"numeric" });
+    }catch(e){ return iso; }
+  }
+
+  function fmtTime(ms){
+    if(!ms && ms !== 0) return "0:00";
+    let s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    s = s % 60;
+    return m + ":" + (s < 10 ? "0" : "") + s;
+  }
+
+  function fmtPlays(n){
+    if(n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, "") + "M";
+    if(n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + "K";
+    return String(n);
+  }
+
+  function playIconSVG(){
+    return '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+  }
+
+  function seededRandomFactory(seedStr){
+    let h = 1779033703 ^ seedStr.length;
+    for(let i = 0; i < seedStr.length; i++){
+      h = Math.imul(h ^ seedStr.charCodeAt(i), 3432918353);
+      h = (h << 13) | (h >>> 19);
+    }
+    return function(){
+      h = Math.imul(h ^ (h >>> 16), 2246822507);
+      h = Math.imul(h ^ (h >>> 13), 3266489909);
+      h ^= h >>> 16;
+      return (h >>> 0) / 4294967296;
+    };
+  }
+
+  function buildWaveform(seedStr){
+    const container = document.getElementById("waveform");
+    container.innerHTML = "";
+    const rand = seededRandomFactory(seedStr);
+    let prev = 0.5;
+    for(let i = 0; i < BAR_COUNT; i++){
+      const target = 0.15 + rand() * 0.85;
+      prev = prev * 0.55 + target * 0.45;
+      const bar = document.createElement("div");
+      bar.className = "bar";
+      bar.style.height = Math.round(prev * 100) + "%";
+      container.appendChild(bar);
+    }
+    container.onclick = (e) => {
+      if(!currentWidget || !currentDurationMs) return;
+      const rect = container.getBoundingClientRect();
+      const frac = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+      currentWidget.seekTo(frac * currentDurationMs);
+      setWaveformProgress(frac);
+    };
+  }
+
+  function setWaveformProgress(frac){
+    const bars = document.querySelectorAll("#waveform .bar");
+    const playedCount = Math.round(frac * bars.length);
+    bars.forEach((b, i) => b.classList.toggle("played", i < playedCount));
+  }
+
+  function setPlayingUI(playing){
+    isPlaying = playing;
+    document.getElementById("np-playicon").innerHTML = playing
+      ? '<path d="M6 5h4v14H6zm8 0h4v14h-4z"></path>'
+      : '<path d="M8 5v14l11-7z"></path>';
+  }
+
+  function volumeIconSVG(vol){
+    if(vol == 0){
+      return '<path d="M16.5 12c0-1.77-1-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.42.05-.63z"/><path d="M19 12c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71z"/><path d="M4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L18.73 21 20 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>';
+    }
+    if(vol < 50){
+      return '<path d="M3 10v4h4l5 5V5L7 10H3z"/><path d="M16.5 12c0-1.77-1-3.29-2.5-4.03v8.06c1.5-.74 2.5-2.26 2.5-4.03z"/>';
+    }
+    return '<path d="M3 10v4h4l5 5V5L7 10H3z"/><path d="M14.5 12c0-1.77-1-3.29-2.5-4.03v8.06c1.5-.74 2.5-2.26 2.5-4.03z"/><path d="M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>';
+  }
+
+  function applyVolume(vol){
+    document.getElementById("vol-slider").value = vol;
+    const pct = vol + "%";
+    document.getElementById("vol-slider").style.background =
+      `linear-gradient(to right, var(--accent) 0%, var(--accent) ${pct}, #4d4d4d ${pct}, #4d4d4d 100%)`;
+    document.getElementById("vol-icon-svg").innerHTML = volumeIconSVG(vol);
+    if(currentWidget) currentWidget.setVolume(vol);
+  }
+
+  function widgetSrc(url){
+    return "https://w.soundcloud.com/player/?url=" + encodeURIComponent(url) +
+      "&auto_play=true&hide_related=true&show_comments=false&show_user=false" +
+      "&show_reposts=false&show_teaser=false&visual=false&single_active=true";
+  }
+
+  function playTrack(track){
+    document.querySelectorAll(".track-row.playing, .album-card.playing").forEach(r => r.classList.remove("playing"));
+    const row = document.getElementById("row-" + track.slug) || document.getElementById("album-" + track.slug);
+    if(row) row.classList.add("playing");
+
+    document.getElementById("np-title").textContent = track.title || track.fallbackTitle;
+    document.getElementById("np-art").src = track.artwork || AVATAR;
+    document.getElementById("nowplaying").classList.add("show");
+    document.getElementById("np-elapsed").textContent = "0:00";
+    document.getElementById("np-duration").textContent = "0:00";
+    currentDurationMs = 0;
+    buildWaveform(track.slug);
+    setPlayingUI(true);
+
+    // Recreate the hidden engine iframe from scratch for every track (rather than
+    // re-navigating the existing one). Reusing the same iframe left the previous
+    // track's SC.Widget listeners still attached to its contentWindow, so once a
+    // second track loaded, both the old and new bindings fired against the same
+    // waveform/time UI and it broke. A fresh element guarantees only one binding.
+    currentWidget = null;
+    currentDurationMs = 0;
+    const oldEngine = document.getElementById("sc-audio-engine");
+    const engine = document.createElement("iframe");
+    engine.id = "sc-audio-engine";
+    engine.className = "sc-audio-engine";
+    engine.scrolling = "no";
+    engine.frameBorder = "no";
+    engine.allow = "autoplay";
+    oldEngine.replaceWith(engine);
+    engine.src = widgetSrc(track.url);
+
+    engine.onload = () => {
+      currentWidget = SC.Widget(engine);
+      currentWidget.bind(SC.Widget.Events.READY, () => {
+        currentWidget.getDuration((d) => {
+          currentDurationMs = d;
+          document.getElementById("np-duration").textContent = fmtTime(d);
+        });
+        currentWidget.setVolume(lastVolume);
+      });
+      currentWidget.bind(SC.Widget.Events.PLAY, () => setPlayingUI(true));
+      currentWidget.bind(SC.Widget.Events.PAUSE, () => setPlayingUI(false));
+      currentWidget.bind(SC.Widget.Events.FINISH, () => setPlayingUI(false));
+      currentWidget.bind(SC.Widget.Events.PLAY_PROGRESS, (e) => {
+        document.getElementById("np-elapsed").textContent = fmtTime(e.currentPosition);
+        const frac = currentDurationMs ? e.currentPosition / currentDurationMs : 0;
+        setWaveformProgress(frac);
+      });
+    };
+  }
+
+  function togglePlayback(){
+    if(currentWidget) currentWidget.toggle();
+  }
+
+  function buildRow(track, index){
+    const row = document.createElement("div");
+    row.className = "track-row";
+    row.id = "row-" + track.slug;
+    row.innerHTML = `
+      <div class="idx-cell">
+        <span class="idx-num">${index + 1}</span>
+        <span class="idx-play">${playIconSVG()}</span>
+      </div>
+      <div class="title-cell">
+        <img src="${track.artwork || AVATAR}" alt="">
+        <div class="title-text">
+          <div class="t">${track.title || track.fallbackTitle}</div>
+          <div class="a">WickedMurder©</div>
+        </div>
+      </div>
+      <div class="plays-cell">${fmtPlays(track.plays)}</div>
+      <div class="date-cell">${formatDate(track.date)}</div>
+    `;
+    row.addEventListener("click", () => playTrack(track));
+    return row;
+  }
+
+  async function fetchMeta(track){
+    const trackUrl = `https://soundcloud.com/${ARTIST}/${track.path || track.slug}`;
+    track.url = trackUrl;
+    try{
+      const res = await fetch(`https://soundcloud.com/oembed?format=json&url=${encodeURIComponent(trackUrl)}`);
+      if(!res.ok) throw new Error("oEmbed failed");
+      const data = await res.json();
+      track.title = (data.title || "").replace(/\s+by\s+WickedMurder.*/i, "").trim() || track.fallbackTitle;
+      if(data.thumbnail_url){
+        track.artwork = data.thumbnail_url.replace("-large", "-t500x500");
+      }
+    }catch(e){
+      track.title = track.fallbackTitle;
+    }
+    return track;
+  }
+
+  function buildAlbumCard(album){
+    const card = document.createElement("div");
+    card.className = "album-card";
+    card.id = "album-" + album.slug;
+    const year = (album.date || "").slice(0, 4);
+    card.innerHTML = `
+      <div class="art-wrap">
+        <img src="${album.artwork || AVATAR}" alt="">
+        <div class="play-overlay">${playIconSVG()}</div>
+      </div>
+      <div class="a-title">${album.title || album.fallbackTitle}</div>
+      <div class="a-sub">${year} · Album</div>
+    `;
+    card.addEventListener("click", () => playTrack(album));
+    return card;
+  }
+
+  async function renderAlbums(list, gridElId){
+    const gridEl = document.getElementById(gridElId);
+    list.forEach(a => gridEl.appendChild(buildAlbumCard(a)));
+
+    for(let i = 0; i < list.length; i++){
+      const album = await fetchMeta(list[i]);
+      const existing = document.getElementById("album-" + album.slug);
+      if(existing) existing.replaceWith(buildAlbumCard(album));
+    }
+  }
+
+  async function renderList(list, rowsElId){
+    const rowsEl = document.getElementById(rowsElId);
+    list.forEach((t, i) => rowsEl.appendChild(buildRow(t, i)));
+
+    for(let i = 0; i < list.length; i++){
+      const track = await fetchMeta(list[i]);
+      const existing = document.getElementById("row-" + track.slug);
+      if(existing) existing.replaceWith(buildRow(track, i));
+    }
+  }
+
+  function init(){
+    renderList(TRACKS, "rows-tracks");
+    renderAlbums(ALBUMS, "albums-grid");
+
+    document.getElementById("hero-play").addEventListener("click", () => {
+      if(TRACKS[0]) playTrack(TRACKS[0]);
+    });
+    document.getElementById("np-playbtn").addEventListener("click", togglePlayback);
+
+    const slider = document.getElementById("vol-slider");
+    applyVolume(lastVolume);
+    slider.addEventListener("input", (e) => {
+      lastVolume = parseInt(e.target.value, 10);
+      applyVolume(lastVolume);
+    });
+    document.getElementById("vol-icon").addEventListener("click", () => {
+      if(lastVolume > 0){
+        slider.dataset.prev = lastVolume;
+        lastVolume = 0;
+      } else {
+        lastVolume = parseInt(slider.dataset.prev || "80", 10);
+      }
+      applyVolume(lastVolume);
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if(e.code === "Space" || e.key === " "){
+        e.preventDefault();
+        togglePlayback();
+      }
+    });
+  }
+
+  init();
+</script>
+</body>
+</html>
