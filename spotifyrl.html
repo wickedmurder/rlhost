@@ -749,7 +749,7 @@
             <circle cx="12" cy="12" r="12" fill="#2e77ff"/>
             <path d="M9.9 16.2l-3.4-3.4 1.4-1.4 2 2 5.2-5.2 1.4 1.4z" fill="#fff"/>
           </svg>
-          Verified Artist
+          Artist
         </div>
         <h1>1nf4my</h1>
         <div class="sub"><b>1.1M</b>&nbsp;monthly listeners · <b>55,801</b>&nbsp;followers</div>
@@ -992,6 +992,31 @@
   let pendingTrack = null;
   let playbackRequestId = 0;
 
+  /*
+   * FIRST-TAP FIX (mobile)
+   *
+   * Mobile browsers only allow audio to start when play() is called straight
+   * from a tap, on a sound that is already loaded. Asking the player to load
+   * a new track and auto-play it afterwards happens too late, so the very
+   * first tap used to do nothing and the second tap worked.
+   *
+   *  - engineTrackUrl tracks which sound the hidden player currently holds.
+   *    If the tapped track is already loaded, we just call play() in the tap.
+   *  - Otherwise, until audio has been unlocked once, we also call play()
+   *    (silently, volume 0) inside the tap before loading the new track.
+   */
+  let engineTrackUrl = "";
+  let audioUnlocked = false;
+  let unlockMuted = false;
+  let playConfirmed = false;
+  let catalogStarted = false;
+
+  function restoreVolumeAfterUnlock(){
+    if(!unlockMuted) return;
+    unlockMuted = false;
+    try{ if(scEngine) scEngine.setVolume(lastVolume); }catch(e){}
+  }
+
   function ensureSoundCloudWidget(){
     if(scEngine) return scEngine;
 
@@ -1006,6 +1031,14 @@
       try{
         scEngine.setVolume(lastVolume);
       }catch(e){}
+      unlockMuted = false;
+
+      // Start the catalog loader only once the player is ready, so it doesn't
+      // compete with the player for bandwidth on slow mobile connections.
+      if(!catalogStarted){
+        catalogStarted = true;
+        setTimeout(discoverAllTracks, 2000);
+      }
 
       if(pendingTrack){
         const track = pendingTrack;
@@ -1015,6 +1048,8 @@
     });
 
     scEngine.bind(SC.Widget.Events.PLAY, () => {
+      audioUnlocked = true;          // a play() call has now actually started audio
+      if(!unlockMuted) playConfirmed = true;
       setPlayingUI(true);
       document.getElementById("nowplaying").classList.add("is-playing");
       document.getElementById("hero-play").classList.add("is-playing");
@@ -1097,12 +1132,17 @@
         single_active: true,
         buying: false,
         sharing: false,
-        download: false
+        download: false,
+        callback: restoreVolumeAfterUnlock
       });
+      engineTrackUrl = url;
     }catch(e){
       console.warn("SoundCloud load failed:", e);
       setPlayingUI(false);
     }
+
+    // Safety net: never leave the player muted if the callback doesn't fire.
+    setTimeout(restoreVolumeAfterUnlock, 4000);
 
     pollDuration(requestId);
   }
@@ -1139,6 +1179,13 @@
     playbackRequestId++;
     const requestId = playbackRequestId;
     setPlayingUI(true);
+    playConfirmed = false;
+
+    // If audio never actually starts (e.g. the browser still blocked it), make
+    // the play button show the truth instead of pretending to play.
+    setTimeout(() => {
+      if(requestId === playbackRequestId && !playConfirmed) setPlayingUI(false);
+    }, 3500);
 
     if(!widget || !scEngineReady){
       /*
@@ -1162,8 +1209,36 @@
       currentWidget = scEngine;
       const engine = document.getElementById("sc-audio-engine");
       engine.src = widgetSrc(track.url, true);
+      engineTrackUrl = track.url;
       pollDuration(requestId);
       return;
+    }
+
+    currentWidget = scEngine;
+
+    if(engineTrackUrl === track.url){
+      // The sound is already loaded in the player: start it directly inside
+      // the tap, which is the one thing mobile browsers always allow.
+      try{
+        scEngine.seekTo(0);
+        scEngine.play();
+      }catch(e){
+        console.warn("SoundCloud play failed:", e);
+      }
+      pollDuration(requestId);
+      return;
+    }
+
+    if(!audioUnlocked){
+      // First playback on this page: unlock audio with a silent play() inside
+      // the tap, then load the requested track (volume is restored on load).
+      try{
+        unlockMuted = true;
+        scEngine.setVolume(0);
+        scEngine.play();
+      }catch(e){
+        unlockMuted = false;
+      }
     }
 
     loadTrackIntoWidget(track, requestId);
@@ -1547,10 +1622,13 @@
      * track.
      */
     const engine = document.getElementById("sc-audio-engine");
-    engine.src = widgetSrc(`https://soundcloud.com/${ARTIST}/${TRACKS[0].slug}`, false);
+    engineTrackUrl = `https://soundcloud.com/${ARTIST}/${TRACKS[0].slug}`;
+    engine.src = widgetSrc(engineTrackUrl, false);
     engine.onload = () => {
       ensureSoundCloudWidget();
     };
+    // Attach right away too, so READY can't be missed on slow connections.
+    ensureSoundCloudWidget();
 
     renderList(TRACKS, "rows-tracks");
     renderAlbums(ALBUMS, "albums-grid");
@@ -1624,8 +1702,6 @@
         setView(item.dataset.view);
       });
     });
-
-    discoverAllTracks();
 
     // Mobile sidebar drawer
     const sidebar = document.getElementById("sidebar");
