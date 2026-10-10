@@ -1020,10 +1020,20 @@
   function ensureSoundCloudWidget(){
     if(scEngine) return scEngine;
 
+    // SoundCloud's script may be blocked or still loading; never let that
+    // break the rest of the page.
+    if(typeof SC === "undefined" || !SC.Widget) return null;
+
     const engine = document.getElementById("sc-audio-engine");
     if(!engine) return null;
 
-    scEngine = SC.Widget(engine);
+    try{
+      scEngine = SC.Widget(engine);
+    }catch(e){
+      console.warn("SoundCloud widget unavailable:", e);
+      scEngine = null;
+      return null;
+    }
 
     scEngine.bind(SC.Widget.Events.READY, () => {
       scEngineReady = true;
@@ -1612,6 +1622,11 @@
   }
 
   function init(){
+    // Draw the track and album lists first so they always appear, even if the
+    // SoundCloud player fails to load.
+    renderList(TRACKS, "rows-tracks");
+    renderAlbums(ALBUMS, "albums-grid");
+
     /*
      * Initialize the SoundCloud widget once. Do NOT wait for this before
      * accepting a user's tap; playTrack() queues a request if initialization
@@ -1625,13 +1640,10 @@
     engineTrackUrl = `https://soundcloud.com/${ARTIST}/${TRACKS[0].slug}`;
     engine.src = widgetSrc(engineTrackUrl, false);
     engine.onload = () => {
-      ensureSoundCloudWidget();
+      try{ ensureSoundCloudWidget(); }catch(e){ console.warn(e); }
     };
     // Attach right away too, so READY can't be missed on slow connections.
-    ensureSoundCloudWidget();
-
-    renderList(TRACKS, "rows-tracks");
-    renderAlbums(ALBUMS, "albums-grid");
+    try{ ensureSoundCloudWidget(); }catch(e){ console.warn(e); }
 
     document.getElementById("hero-play").addEventListener("click", () => {
       if(TRACKS[0]) playTrack(TRACKS[0]);
